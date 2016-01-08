@@ -1,4 +1,4 @@
-all: djinni example_ios example_android test
+all: djinni example_ios example_android example_localhost test
 
 clean:
 	-ndk-build -C example/android/app/ clean
@@ -7,7 +7,7 @@ clean:
 	-rm -rf obj/
 	-rm -rf build/
 	-rm -rf build_ios/
-	-rm GypAndroid.mk
+	-rm -f GypAndroid.mk
 
 # rule to lazily clone gyp
 # freeze gyp at the last version with android support
@@ -32,7 +32,8 @@ example_ios: ./build_ios/example/libtextsort.xcodeproj
 	xcodebuild -workspace example/objc/TextSort.xcworkspace \
            -scheme TextSort \
            -configuration 'Debug' \
-           -sdk iphonesimulator
+           -sdk iphonesimulator \
+	   -destination 'platform=iOS Simulator,name=iPhone 6s,OS=9.2'
 
 # this target implicitly depends on GypAndroid.mk since gradle will try to make it
 example_android: GypAndroid.mk
@@ -40,7 +41,10 @@ example_android: GypAndroid.mk
 	@echo "Apks produced at:"
 	@python example/glob.py example/ '*.apk'
 
-test:
+example_localhost: ./deps/java
+	cd example && make localhost
+
+test: ./deps/java
 	make -C test-suite
 
-.PHONY: example_android example_ios test djinni clean all
+.PHONY: example_android example_ios example_localhost test djinni clean all

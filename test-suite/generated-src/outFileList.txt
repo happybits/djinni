@@ -4,6 +4,7 @@ djinni-output-temp/cpp/record_with_duration_and_derivings.cpp
 djinni-output-temp/cpp/date_record.hpp
 djinni-output-temp/cpp/date_record.cpp
 djinni-output-temp/cpp/map_date_record.hpp
+djinni-output-temp/cpp/constant_record.hpp
 djinni-output-temp/cpp/constants.hpp
 djinni-output-temp/cpp/constants.cpp
 djinni-output-temp/cpp/constants_interface.hpp
@@ -17,6 +18,7 @@ djinni-output-temp/cpp/color.hpp
 djinni-output-temp/cpp/opt_color_record.hpp
 djinni-output-temp/cpp/client_returned_record.hpp
 djinni-output-temp/cpp/client_interface.hpp
+djinni-output-temp/cpp/reverse_client_interface.hpp
 djinni-output-temp/cpp/cpp_exception.hpp
 djinni-output-temp/cpp/primitive_list.hpp
 djinni-output-temp/cpp/map_record.hpp
@@ -31,6 +33,7 @@ djinni-output-temp/java/TestDuration.java
 djinni-output-temp/java/RecordWithDurationAndDerivings.java
 djinni-output-temp/java/DateRecord.java
 djinni-output-temp/java/MapDateRecord.java
+djinni-output-temp/java/ConstantRecord.java
 djinni-output-temp/java/Constants.java
 djinni-output-temp/java/ConstantsInterface.java
 djinni-output-temp/java/AssortedPrimitives.java
@@ -41,6 +44,7 @@ djinni-output-temp/java/Color.java
 djinni-output-temp/java/OptColorRecord.java
 djinni-output-temp/java/ClientReturnedRecord.java
 djinni-output-temp/java/ClientInterface.java
+djinni-output-temp/java/ReverseClientInterface.java
 djinni-output-temp/java/CppException.java
 djinni-output-temp/java/PrimitiveList.java
 djinni-output-temp/java/MapRecord.java
@@ -57,6 +61,8 @@ djinni-output-temp/jni/NativeDateRecord.hpp
 djinni-output-temp/jni/NativeDateRecord.cpp
 djinni-output-temp/jni/NativeMapDateRecord.hpp
 djinni-output-temp/jni/NativeMapDateRecord.cpp
+djinni-output-temp/jni/NativeConstantRecord.hpp
+djinni-output-temp/jni/NativeConstantRecord.cpp
 djinni-output-temp/jni/NativeConstants.hpp
 djinni-output-temp/jni/NativeConstants.cpp
 djinni-output-temp/jni/NativeConstantsInterface.hpp
@@ -76,6 +82,8 @@ djinni-output-temp/jni/NativeClientReturnedRecord.hpp
 djinni-output-temp/jni/NativeClientReturnedRecord.cpp
 djinni-output-temp/jni/NativeClientInterface.hpp
 djinni-output-temp/jni/NativeClientInterface.cpp
+djinni-output-temp/jni/NativeReverseClientInterface.hpp
+djinni-output-temp/jni/NativeReverseClientInterface.cpp
 djinni-output-temp/jni/NativeCppException.hpp
 djinni-output-temp/jni/NativeCppException.cpp
 djinni-output-temp/jni/NativePrimitiveList.hpp
@@ -99,6 +107,8 @@ djinni-output-temp/objc/DBDateRecord.h
 djinni-output-temp/objc/DBDateRecord.mm
 djinni-output-temp/objc/DBMapDateRecord.h
 djinni-output-temp/objc/DBMapDateRecord.mm
+djinni-output-temp/objc/DBConstantRecord.h
+djinni-output-temp/objc/DBConstantRecord.mm
 djinni-output-temp/objc/DBConstants.h
 djinni-output-temp/objc/DBConstants.mm
 djinni-output-temp/objc/DBConstantsInterface.h
@@ -115,6 +125,7 @@ djinni-output-temp/objc/DBOptColorRecord.mm
 djinni-output-temp/objc/DBClientReturnedRecord.h
 djinni-output-temp/objc/DBClientReturnedRecord.mm
 djinni-output-temp/objc/DBClientInterface.h
+djinni-output-temp/objc/DBReverseClientInterface.h
 djinni-output-temp/objc/DBCppException.h
 djinni-output-temp/objc/DBPrimitiveList.h
 djinni-output-temp/objc/DBPrimitiveList.mm
@@ -138,6 +149,8 @@ djinni-output-temp/objc/DBDateRecord+Private.h
 djinni-output-temp/objc/DBDateRecord+Private.mm
 djinni-output-temp/objc/DBMapDateRecord+Private.h
 djinni-output-temp/objc/DBMapDateRecord+Private.mm
+djinni-output-temp/objc/DBConstantRecord+Private.h
+djinni-output-temp/objc/DBConstantRecord+Private.mm
 djinni-output-temp/objc/DBConstants+Private.h
 djinni-output-temp/objc/DBConstants+Private.mm
 djinni-output-temp/objc/DBConstantsInterface+Private.h
@@ -156,6 +169,8 @@ djinni-output-temp/objc/DBClientReturnedRecord+Private.h
 djinni-output-temp/objc/DBClientReturnedRecord+Private.mm
 djinni-output-temp/objc/DBClientInterface+Private.h
 djinni-output-temp/objc/DBClientInterface+Private.mm
+djinni-output-temp/objc/DBReverseClientInterface+Private.h
+djinni-output-temp/objc/DBReverseClientInterface+Private.mm
 djinni-output-temp/objc/DBCppException+Private.h
 djinni-output-temp/objc/DBCppException+Private.mm
 djinni-output-temp/objc/DBPrimitiveList+Private.h
