@@ -63,12 +63,35 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
       refs.hpp.add("#include <functional>") // needed for std::hash
     }
 
+    refs.hpp.add("#include <iostream>")
+    refs.hpp.add("#include <string>")
+    refs.hpp.add("#include <map>")
+
     writeHppFile(ident, origin, refs.hpp, refs.hppFwds, w => {
       w.w(s"enum class $self : int").bracedSemi {
         for (o <- e.options) {
           writeDoc(w, o.doc)
           w.wl(idCpp.enum(o.ident.name) + ",")
         }
+      }
+      w.wl
+      w.w(s"class ${self}ValueMap").bracedSemi {
+        w.wl("public:")
+        w.w(s"std::string valueName($self val)").braced {
+          w.wl("return valueMap_.at(val);")
+        }
+        w.wl("private:")
+        w.w(s"const std::map<$self, std::string> valueMap_").bracedSemi {
+          for (o <- e.options) {
+            val oname = idCpp.enum(o.ident.name)
+            w.wl("{"+self+"::"+oname+", "+q(oname)+"},")
+          }
+        }
+      }
+      w.wl
+      w.w(s"inline std::ostream &operator<<(std::ostream& os, $self val)").braced {
+        w.wl(s"${self}ValueMap valueMap;")
+        w.wl("return os << valueMap.valueName(val);")
       }
     },
     w => {
