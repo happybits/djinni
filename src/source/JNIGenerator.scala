@@ -187,7 +187,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
 
     def writeJniPrototype(w: IndentWriter) {
       writeJniTypeParams(w, typeParams)
-      w.w(s"class $jniSelf final : $baseType").bracedSemi {
+      w.w(s"class $jniSelf final : public $baseType").bracedSemi {
         w.wlOutdent(s"public:")
         spec.cppNnType match {
           case Some(nnPtr) =>
