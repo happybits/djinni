@@ -3,6 +3,7 @@
         {
             "target_name": "djinni_jni",
             "type": "static_library",
+            'cflags': ['-Wno-exceptions'],
             "sources": [
               "djinni_common.hpp",
               "jni/djinni_support.cpp",
