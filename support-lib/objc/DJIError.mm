@@ -22,13 +22,19 @@ static_assert(__has_feature(objc_arc), "Djinni requires ARC to be enabled for th
 namespace djinni {
 
 [[noreturn]] __attribute__((weak)) void throwNSExceptionFromCurrent(const char * /*ctx*/) {
-    try {
-        throw;
-    } catch (const std::exception & e) {
-        NSString *message = [NSString stringWithCString:e.what() encoding:NSUTF8StringEncoding];
-        [NSException raise:message format:@"%@", message];
-        __builtin_unreachable();
-    }
+
+    // Disable exception translation - we don't handle exceptions on the app side, so all
+    // exceptions should end up crashing the app anyway. In addition, converting them to NSExceptions
+    // loses source location information about the original exception.
+    throw;
+
+    // try {
+    //     throw;
+    // } catch (const std::exception & e) {
+    //     NSString *message = [NSString stringWithCString:e.what() encoding:NSUTF8StringEncoding];
+    //     [NSException raise:message format:@"%@", message];
+    //     __builtin_unreachable();
+    // }
 }
 
 } // namespace djinni
