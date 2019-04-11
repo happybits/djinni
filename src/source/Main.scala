@@ -62,6 +62,7 @@ object Main {
     var objcIdentStyle = IdentStyle.objcDefault
     var objcTypePrefix: String = ""
     var objcIncludePrefix: String = ""
+    var objcClosedEnums: Boolean = false
     var objcppIncludePrefix: String = ""
     var objcppIncludeCppPrefix: String = ""
     var objcppIncludeObjcPrefixOptional: Option[String] = None
@@ -150,6 +151,8 @@ object Main {
         .text("The prefix for Objective-C data types (usually two or three letters)")
       opt[String]("objc-include-prefix").valueName("<prefix>").foreach(objcIncludePrefix = _)
         .text("The prefix for #import of header files from Objective-C files.")
+      opt[Boolean]("objc-closed-enums").valueName("<true/false>").foreach(x => objcClosedEnums = x)
+        .text("All generated Objective-C enums will be NS_CLOSED_ENUM (default: false). ")
       note("")
       opt[File]("objcpp-out").valueName("<out-folder>").foreach(x => objcppOutFolder = Some(x))
         .text("The output folder for private Objective-C++ files (Generator disabled if unspecified).")
@@ -304,6 +307,7 @@ object Main {
       objcppIncludeObjcPrefix,
       objcppNamespace,
       objcBaseLibIncludePrefix,
+      objcClosedEnums,
       outFileListWriter,
       skipGeneration,
       yamlOutFolder,

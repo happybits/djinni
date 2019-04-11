@@ -53,7 +53,7 @@ class ObjcGenerator(spec: Spec) extends Generator(spec) {
     val self = marshal.typename(ident, e)
     writeObjcFile(marshal.headerName(ident), origin, refs.header, w => {
       writeDoc(w, doc)
-      w.wl(s"typedef NS_ENUM(NSInteger, $self)")
+      w.wl(if (spec.objcClosedEnums) s"typedef NS_CLOSED_ENUM(NSInteger, $self)" else s"typedef NS_ENUM(NSInteger, $self)")
       w.bracedSemi {
         for (i <- e.options) {
           writeDoc(w, i.doc)
