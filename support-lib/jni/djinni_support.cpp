@@ -21,6 +21,17 @@
 #include <cstdlib>
 #include <cstring>
 
+// Uncomment these includes to log JNI exceptions to logcat before throwing.
+//
+// You will also need to add
+//     LOCAL_LDLIBS := -llog
+// to `hbmx/prebuilt/prebuilt.target.mk`.
+//
+// Then uncomment and see `appendExceptionInfo()` below.
+//#include <iostream>
+//#include <sstream>
+//#include <android/log.h>
+
 static_assert(sizeof(jlong) >= sizeof(void*), "must be able to fit a void* into a jlong");
 
 namespace djinni {
@@ -113,8 +124,83 @@ void jniExceptionCheck(JNIEnv * env) {
     }
 }
 
+// Uncomment these next two methods, and the line in `jniThrowCppFromJavaException()`, to log JNI exceptions to logcat
+//static void appendExceptionInfo(
+//        JNIEnv *env,
+//        std::ostringstream &out,
+//        jthrowable exception,
+//        jmethodID throwable_getCause,
+//        jmethodID throwable_getStackTrace,
+//        jmethodID throwable_toString,
+//        jmethodID stackTraceElement_toString)
+//{
+//    auto frames = (jobjectArray)env->CallObjectMethod(exception, throwable_getStackTrace);
+//    auto framesLength = env->GetArrayLength(frames);
+//
+//    if (frames) {
+//        auto cause = (jstring)env->CallObjectMethod(exception, throwable_toString);
+//        auto cause_raw = env->GetStringUTFChars(cause, nullptr);
+//        if (out.tellp() > 0) {
+//            out << "\n" << "Caused by: ";
+//        }
+//        out << cause_raw;
+//        env->ReleaseStringUTFChars(cause, cause_raw);
+//        env->DeleteLocalRef(cause);
+//    }
+//
+//    if (framesLength > 0) {
+//        for (jsize i = 0; i < framesLength; i++) {
+//            auto frame = env->GetObjectArrayElement(frames, i);
+//            auto frameString = (jstring)env->CallObjectMethod(frame, stackTraceElement_toString);
+//            auto frameStringRaw = env->GetStringUTFChars(frameString, nullptr);
+//            out << "\n    " << frameStringRaw;
+//            env->ReleaseStringUTFChars(frameString, frameStringRaw);
+//            env->DeleteLocalRef(frameString);
+//            env->DeleteLocalRef(frame);
+//        }
+//    }
+//
+//    if (frames) {
+//        auto cause = (jthrowable)env->CallObjectMethod(exception, throwable_getCause);
+//        if (cause) {
+//            appendExceptionInfo(
+//                    env,
+//                    out,
+//                    cause,
+//                    throwable_getCause,
+//                    throwable_getStackTrace,
+//                    throwable_toString,
+//                    stackTraceElement_toString);
+//            env->DeleteLocalRef(cause);
+//        }
+//        env->DeleteLocalRef(frames);
+//    }
+//}
+//
+//static void logExceptionInfo(JNIEnv *env, jthrowable java_exception) {
+//    auto throwable = env->FindClass("java/lang/Throwable");
+//    auto throwable_getCause = env->GetMethodID(throwable, "getCause", "()Ljava/lang/Throwable;");
+//    auto throwable_getStackTrace = env->GetMethodID(throwable, "getStackTrace", "()[Ljava/lang/StackTraceElement;");
+//    auto throwable_toString = env->GetMethodID(throwable, "toString", "()Ljava/lang/String;");
+//
+//    auto stackTraceElement = env->FindClass("java/lang/StackTraceElement");
+//    auto stackTraceElement_toString = env->GetMethodID(stackTraceElement, "toString", "()Ljava/lang/String;");
+//
+//    std::ostringstream errorInfo;
+//    appendExceptionInfo(
+//            env,
+//            errorInfo,
+//            java_exception,
+//            throwable_getCause,
+//            throwable_getStackTrace,
+//            throwable_toString,
+//            stackTraceElement_toString);
+//    __android_log_print(ANDROID_LOG_ERROR, "MarcoPolo-Djinni", "%s", errorInfo.str().c_str());
+//}
+
 DJINNI_WEAK_DEFINITION __attribute__((noreturn))
 void jniThrowCppFromJavaException(JNIEnv * env, jthrowable java_exception) {
+//    logExceptionInfo(env, java_exception);
     throw jni_exception { env, java_exception };
 }
 
