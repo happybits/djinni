@@ -24,20 +24,26 @@ import djinni.syntax.Error
 import djinni.writer.IndentWriter
 import scala.language.implicitConversions
 import scala.collection.mutable
+import scala.util.matching.Regex
 
 package object generatorTools {
 
   case class Spec(
                    javaOutFolder: Option[File],
                    javaPackage: Option[String],
+                   javaClassAccessModifier: JavaAccessModifier.Value,
                    javaIdentStyle: JavaIdentStyle,
                    javaCppException: Option[String],
                    javaAnnotation: Option[String],
+                   javaGenerateInterfaces: Boolean,
                    javaNullableAnnotation: Option[String],
                    javaNonnullAnnotation: Option[String],
+                   javaImplementAndroidOsParcelable: Boolean,
+                   javaUseFinalForRecord: Boolean,
                    cppOutFolder: Option[File],
                    cppHeaderOutFolder: Option[File],
                    cppIncludePrefix: String,
+                   cppExtendedRecordIncludePrefix: String,
                    cppNamespace: String,
                    cppIdentStyle: CppIdentStyle,
                    cppFileIdentStyle: IdentConverter,
@@ -47,6 +53,7 @@ package object generatorTools {
                    cppNnHeader: Option[String],
                    cppNnType: Option[String],
                    cppNnCheckExpression: Option[String],
+                   cppUseWideStrings: Boolean,
                    jniOutFolder: Option[File],
                    jniHeaderOutFolder: Option[File],
                    jniIncludePrefix: String,
@@ -64,11 +71,14 @@ package object generatorTools {
                    objcppExt: String,
                    objcHeaderExt: String,
                    objcIncludePrefix: String,
+                   objcExtendedRecordIncludePrefix: String,
                    objcppIncludePrefix: String,
                    objcppIncludeCppPrefix: String,
                    objcppIncludeObjcPrefix: String,
                    objcppNamespace: String,
                    objcBaseLibIncludePrefix: String,
+                   objcSwiftBridgingHeaderWriter: Option[Writer],
+                   objcSwiftBridgingHeaderName: Option[String],
                    objcClosedEnums: Boolean,
                    outFileListWriter: Option[Writer],
                    skipGeneration: Boolean,
@@ -80,7 +90,7 @@ package object generatorTools {
     if (s.isEmpty) s else ", " + s
   }
   def q(s: String) = '"' + s + '"'
-  def firstUpper(token: String) = token.charAt(0).toUpper + token.substring(1)
+  def firstUpper(token: String) = if (token.isEmpty()) token else token.charAt(0).toUpper + token.substring(1)
 
   type IdentConverter = String => String
 
@@ -134,6 +144,20 @@ package object generatorTools {
       None
     }
   }
+
+  object JavaAccessModifier extends Enumeration {
+    val Public = Value("public")
+    val Package = Value("package")
+
+    def getCodeGenerationString(javaAccessModifier: JavaAccessModifier.Value): String = {
+      javaAccessModifier match {
+        case Public => "public "
+        case Package => "/*package*/ "
+      }
+    }
+
+  }
+  implicit val javaAccessModifierReads: scopt.Read[JavaAccessModifier.Value] = scopt.Read.reads(JavaAccessModifier withName _)
 
   final case class SkipFirst() {
     private var first = true
@@ -195,11 +219,16 @@ package object generatorTools {
         }
         new ObjcppGenerator(spec).generate(idl)
       }
+      if (spec.objcSwiftBridgingHeaderWriter.isDefined) {
+        SwiftBridgingHeaderGenerator.writeAutogenerationWarning(spec.objcSwiftBridgingHeaderName.get, spec.objcSwiftBridgingHeaderWriter.get)
+        SwiftBridgingHeaderGenerator.writeBridgingVars(spec.objcSwiftBridgingHeaderName.get, spec.objcSwiftBridgingHeaderWriter.get)
+        new SwiftBridgingHeaderGenerator(spec).generate(idl)
+      }
       if (spec.yamlOutFolder.isDefined) {
         if (!spec.skipGeneration) {
           createFolder("YAML", spec.yamlOutFolder.get)
-          new YamlGenerator(spec).generate(idl)
         }
+        new YamlGenerator(spec).generate(idl)
       }
       None
     }
@@ -213,9 +242,12 @@ package object generatorTools {
   case class DeclRef(decl: String, namespace: Option[String]) extends SymbolReference
 }
 
+object Generator {
+  val writtenFiles = mutable.HashMap[String,String]()
+}
+
 abstract class Generator(spec: Spec)
 {
-  protected val writtenFiles = mutable.HashMap[String,String]()
 
   protected def createFile(folder: File, fileName: String, makeWriter: OutputStreamWriter => IndentWriter, f: IndentWriter => Unit): Unit = {
     if (spec.outFileListWriter.isDefined) {
@@ -227,7 +259,7 @@ abstract class Generator(spec: Spec)
 
     val file = new File(folder, fileName)
     val cp = file.getCanonicalPath
-    writtenFiles.put(cp.toLowerCase, cp) match {
+    Generator.writtenFiles.put(cp.toLowerCase, cp) match {
       case Some(existing) =>
         if (existing == cp) {
           throw GenerateException("Refusing to write \"" + file.getPath + "\"; we already wrote a file to that path.")
@@ -306,7 +338,9 @@ abstract class Generator(spec: Spec)
       w.wl
       val myHeader = q(includePrefix + fileIdentStyle(name) + "." + spec.cppHeaderExt)
       w.wl(s"#include $myHeader  // my header")
-      includes.foreach(w.wl(_))
+      val myHeaderInclude = s"#include $myHeader"
+      for (include <- includes if include != myHeaderInclude)
+        w.wl(include)
       w.wl
       wrapNamespace(w, namespace, f)
     })
@@ -361,7 +395,43 @@ abstract class Generator(spec: Spec)
     w.w(end)
   }
 
+  def normalEnumOptions(e: Enum) = e.options.filter(_.specialFlag == None)
+
+  def writeEnumOptionNone(w: IndentWriter, e: Enum, ident: IdentConverter) {
+    for (o <- e.options.find(_.specialFlag == Some(Enum.SpecialFlag.NoFlags))) {
+      writeDoc(w, o.doc)
+      w.wl(ident(o.ident.name) + " = 0,")
+    }
+  }
+
+  def writeEnumOptions(w: IndentWriter, e: Enum, ident: IdentConverter) {
+    var shift = 0
+    for (o <- normalEnumOptions(e)) {
+      writeDoc(w, o.doc)
+      w.wl(ident(o.ident.name) + (if(e.flags) s" = 1 << $shift" else "") + ",")
+      shift += 1
+    }
+  }
+
+  def writeEnumOptionAll(w: IndentWriter, e: Enum, ident: IdentConverter) {
+    for (o <- e.options.find(_.specialFlag == Some(Enum.SpecialFlag.AllFlags))) {
+      writeDoc(w, o.doc)
+      w.w(ident(o.ident.name) + " = ")
+      w.w(normalEnumOptions(e).map(o => ident(o.ident.name)).fold("0")((acc, o) => acc + " | " + o))
+      w.wl(",")
+    }
+  }
+
   // --------------------------------------------------------------------------
+
+  def writeMethodDoc(w: IndentWriter, method: Interface.Method, ident: IdentConverter) {
+    val paramReplacements = method.params.map(p => (s"\\b${Regex.quote(p.ident.name)}\\b", s"${ident(p.ident.name)}"))
+    val newDoc = Doc(method.doc.lines.map(l => {
+      paramReplacements.foldLeft(l)((line, rep) =>
+        line.replaceAll(rep._1, rep._2))
+    }))
+    writeDoc(w, newDoc)
+  }
 
   def writeDoc(w: IndentWriter, doc: Doc) {
     doc.lines.length match {

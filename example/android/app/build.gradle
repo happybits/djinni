@@ -1,19 +1,24 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.2"
+    compileSdkVersion 28
 
     defaultConfig {
         applicationId "com.dropbox.textsort"
-        minSdkVersion 15
-        targetSdkVersion 23
+        minSdkVersion 16
+        targetSdkVersion 28
         versionCode 1
         versionName "1.0"
     }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
     buildTypes {
         release {
-            runProguard false
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -32,23 +37,32 @@ dependencies {
 }
 
 task ndkBuild(type: Exec) {
-    String MainDirectory = System.getProperty("user.dir") + '/app/'
-    File ndkDir = project.getPlugins().getPlugin('android').ndkFolder
-    if (ndkDir == null) {
-        def gradle_project_root = project.rootProject.rootDir
-        throw new GradleException("NDK is not configured. Make sure there is a local.properties " +
-                "file with an ndk.dir entry in the directory ${gradle_project_root}.")
+    def ndkDir = project.android.ndkDirectory
+    def ndkBuildExecutable
+
+    if (ndkDir) {
+        ndkBuildExecutable = new File(ndkDir, 'ndk-build')
+        def MainDirectory = System.getProperty("user.dir") + '/app/'
+
+        environment("NDK_PROJECT_PATH", MainDirectory)
+        environment("GYP_CONFIGURATION", "Release")
+
+        commandLine ndkBuildExecutable
     }
-    def ndkBuildExecutable = new File(ndkDir, 'ndk-build')
-    if (!ndkBuildExecutable.exists()) {
-        throw new GradleException("Could not find ndk-build. The configured NDK directory ${ndkDir} may not be correct.")
+
+    doFirst {
+        if (!ndkDir) {
+            def gradle_project_root = project.rootProject.rootDir
+            throw new GradleException("NDK is not configured. Make sure there is a local.properties " +
+                    "file with an ndk.dir entry in the directory ${gradle_project_root}.")
+        }
+
+        if (!ndkBuildExecutable.file) {
+            throw new GradleException("Could not find ndk-build. The configured NDK directory ${ndkDir} may not be correct.")
+        }
     }
-    environment("NDK_PROJECT_PATH", MainDirectory)
-    environment("GYP_CONFIGURATION", "Release")
-    commandLine ndkBuildExecutable
 }
 
 tasks.withType(JavaCompile) {
     compileTask -> compileTask.dependsOn ndkBuild
 }
-

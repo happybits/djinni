@@ -16,12 +16,12 @@
 
 + (nonnull instancetype)mapDateRecordWithDatesById:(nonnull NSDictionary<NSString *, NSDate *> *)datesById
 {
-    return [[self alloc] initWithDatesById:datesById];
+    return [(DBMapDateRecord*)[self alloc] initWithDatesById:datesById];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p datesById:%@>", self.class, self, self.datesById];
+    return [NSString stringWithFormat:@"<%@ %p datesById:%@>", self.class, (void *)self, self.datesById];
 }
 
 @end

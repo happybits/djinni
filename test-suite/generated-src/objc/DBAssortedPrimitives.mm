@@ -55,20 +55,20 @@
                                     oFthirtytwo:(nullable NSNumber *)oFthirtytwo
                                     oFsixtyfour:(nullable NSNumber *)oFsixtyfour
 {
-    return [[self alloc] initWithB:b
-                             eight:eight
-                           sixteen:sixteen
-                         thirtytwo:thirtytwo
-                         sixtyfour:sixtyfour
-                        fthirtytwo:fthirtytwo
-                        fsixtyfour:fsixtyfour
-                                oB:oB
-                            oEight:oEight
-                          oSixteen:oSixteen
-                        oThirtytwo:oThirtytwo
-                        oSixtyfour:oSixtyfour
-                       oFthirtytwo:oFthirtytwo
-                       oFsixtyfour:oFsixtyfour];
+    return [(DBAssortedPrimitives*)[self alloc] initWithB:b
+                                                    eight:eight
+                                                  sixteen:sixteen
+                                                thirtytwo:thirtytwo
+                                                sixtyfour:sixtyfour
+                                               fthirtytwo:fthirtytwo
+                                               fsixtyfour:fsixtyfour
+                                                       oB:oB
+                                                   oEight:oEight
+                                                 oSixteen:oSixteen
+                                               oThirtytwo:oThirtytwo
+                                               oSixtyfour:oSixtyfour
+                                              oFthirtytwo:oFthirtytwo
+                                              oFsixtyfour:oFsixtyfour];
 }
 
 - (BOOL)isEqual:(id)other
@@ -114,7 +114,7 @@
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p b:%@ eight:%@ sixteen:%@ thirtytwo:%@ sixtyfour:%@ fthirtytwo:%@ fsixtyfour:%@ oB:%@ oEight:%@ oSixteen:%@ oThirtytwo:%@ oSixtyfour:%@ oFthirtytwo:%@ oFsixtyfour:%@>", self.class, self, @(self.b), @(self.eight), @(self.sixteen), @(self.thirtytwo), @(self.sixtyfour), @(self.fthirtytwo), @(self.fsixtyfour), self.oB, self.oEight, self.oSixteen, self.oThirtytwo, self.oSixtyfour, self.oFthirtytwo, self.oFsixtyfour];
+    return [NSString stringWithFormat:@"<%@ %p b:%@ eight:%@ sixteen:%@ thirtytwo:%@ sixtyfour:%@ fthirtytwo:%@ fsixtyfour:%@ oB:%@ oEight:%@ oSixteen:%@ oThirtytwo:%@ oSixtyfour:%@ oFthirtytwo:%@ oFsixtyfour:%@>", self.class, (void *)self, @(self.b), @(self.eight), @(self.sixteen), @(self.thirtytwo), @(self.sixtyfour), @(self.fthirtytwo), @(self.fsixtyfour), self.oB, self.oEight, self.oSixteen, self.oThirtytwo, self.oSixtyfour, self.oFthirtytwo, self.oFsixtyfour];
 }
 
 @end

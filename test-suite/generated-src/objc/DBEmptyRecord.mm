@@ -15,12 +15,12 @@
 
 + (nonnull instancetype)emptyRecord
 {
-    return [[self alloc] init];
+    return [(DBEmptyRecord*)[self alloc] init];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p>", self.class, self];
+    return [NSString stringWithFormat:@"<%@ %p>", self.class, (void *)self];
 }
 
 @end

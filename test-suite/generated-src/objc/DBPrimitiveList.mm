@@ -16,12 +16,12 @@
 
 + (nonnull instancetype)primitiveListWithList:(nonnull NSArray<NSNumber *> *)list
 {
-    return [[self alloc] initWithList:list];
+    return [(DBPrimitiveList*)[self alloc] initWithList:list];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p list:%@>", self.class, self, self.list];
+    return [NSString stringWithFormat:@"<%@ %p list:%@>", self.class, (void *)self, self.list];
 }
 
 @end

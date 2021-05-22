@@ -1,6 +1,22 @@
+#
+# Environment variables for overriding default behavior.
+#
+
+ifndef ANDROID_NDK_HOME
+ANDROID_NDK_HOME = $(abspath $(dir $(realpath $(shell which ndk-build))))
+endif
+
+SCALA_VERSION=2.11
+DJINNI_VERSION=0.1-SNAPSHOT
+OUTPUT_JAR=src/target/scala-$(SCALA_VERSION)/djinni-assembly-$(DJINNI_VERSION).jar
+
+#
+# Global targets.
+#
+
 all: djinni example_ios example_android example_localhost test
 
-clean:
+clean: djinni_jar_clean test_clean
 	-ndk-build -C example/android/app/ clean
 	-xcodebuild -workspace example/objc/TextSort.xcworkspace -scheme TextSort -configuration 'Debug' -sdk iphonesimulator clean
 	-rm -rf libs/
@@ -18,10 +34,18 @@ clean:
 djinni:
 	cd src && ./build
 
+$(OUTPUT_JAR):
+	cd src && sbt assembly
+
+djinni_jar: $(OUTPUT_JAR)
+
+djinni_jar_clean:
+	cd src && sbt clean
+
 # we specify a root target for android to prevent all of the targets from spidering out
 GypAndroid.mk: ./deps/gyp example/libtextsort.gyp support-lib/support_lib.gyp example/example.djinni
 	./example/run_djinni.sh
-	ANDROID_BUILD_TOP=$(shell dirname `which ndk-build`) deps/gyp/gyp --depth=. -f android -DOS=android -Icommon.gypi example/libtextsort.gyp --root-target=libtextsort_jni
+	ANDROID_BUILD_TOP=$(ANDROID_NDK_HOME) deps/gyp/gyp --depth=. -f android -DOS=android -Icommon.gypi example/libtextsort.gyp --root-target=libtextsort_jni
 
 # we specify a root target for android to prevent all of the targets from spidering out
 ./build_ios/example/libtextsort.xcodeproj: ./deps/gyp example/libtextsort.gyp support-lib/support_lib.gyp example/example.djinni
@@ -32,8 +56,7 @@ example_ios: ./build_ios/example/libtextsort.xcodeproj
 	xcodebuild -workspace example/objc/TextSort.xcworkspace \
            -scheme TextSort \
            -configuration 'Debug' \
-           -sdk iphonesimulator \
-	   -destination 'platform=iOS Simulator,name=iPhone 6s,OS=9.2'
+           -sdk iphonesimulator
 
 # this target implicitly depends on GypAndroid.mk since gradle will try to make it
 example_android: GypAndroid.mk
@@ -47,4 +70,7 @@ example_localhost: ./deps/java
 test: ./deps/java
 	make -C test-suite
 
-.PHONY: example_android example_ios example_localhost test djinni clean all
+test_clean:
+	make -C test-suite clean
+
+.PHONY: example_android example_ios example_localhost test test_clean djinni clean all dinni_jar

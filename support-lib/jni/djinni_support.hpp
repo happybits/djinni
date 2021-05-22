@@ -21,16 +21,11 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <unordered_map>
+#include <vector>
 
 #include "../proxy_cache_interface.hpp"
+#include "../djinni_common.hpp"
 #include <jni.h>
-
-// work-around for missing noexcept and constexpr support in MSVC prior to 2015
-#if (defined _MSC_VER) && (_MSC_VER < 1900)
-#  define noexcept _NOEXCEPT
-#  define constexpr
-#endif
 
 /*
  * Djinni support library
@@ -150,66 +145,43 @@ void jniExceptionCheck(JNIEnv * env);
  * can replace it by defining your own version.  The default implementation
  * will throw a jni_exception containing the given jthrowable.
  */
-__attribute__((noreturn))
+DJINNI_NORETURN_DEFINITION
 void jniThrowCppFromJavaException(JNIEnv * env, jthrowable java_exception);
 
 /*
  * Set an AssertionError in env with message message, and then throw via jniExceptionCheck.
  */
-#ifdef _MSC_VER
-  __declspec(noreturn)
-#else
-  __attribute__((noreturn))
-#endif
+DJINNI_NORETURN_DEFINITION
 void jniThrowAssertionError(JNIEnv * env, const char * file, int line, const char * check);
 
 #define DJINNI_ASSERT_MSG(check, env, message) \
     do { \
-        djinni::jniExceptionCheck(env); \
+        ::djinni::jniExceptionCheck(env); \
         const bool check__res = bool(check); \
-        djinni::jniExceptionCheck(env); \
+        ::djinni::jniExceptionCheck(env); \
         if (!check__res) { \
-            djinni::jniThrowAssertionError(env, __FILE__, __LINE__, message); \
+            ::djinni::jniThrowAssertionError(env, __FILE__, __LINE__, message); \
         } \
     } while(false)
 #define DJINNI_ASSERT(check, env) DJINNI_ASSERT_MSG(check, env, #check)
 
 /*
- * Helper for JniClassInitializer.
- */
-template <class Key, class T>
-class static_registration {
-public:
-    using registration_map = std::unordered_map<Key, T *>;
-    static registration_map get_all() {
-        const std::lock_guard<std::mutex> lock(get_mutex());
-        return get_map();
-    }
-    static_registration(const Key & key, T * obj) : m_key(key) {
-        const std::lock_guard<std::mutex> lock(get_mutex());
-        get_map().emplace(key, obj);
-    }
-    ~static_registration() {
-        const std::lock_guard<std::mutex> lock(get_mutex());
-        get_map().erase(m_key);
-    }
-private:
-    const Key m_key;
-    static registration_map & get_map()   { static registration_map m; return m;   }
-    static std::mutex       & get_mutex() { static std::mutex mtx;     return mtx; }
-};
-
-/*
  * Helper for JniClass. (This can't be a subclass because it needs to not be templatized.)
  */
 class JniClassInitializer {
+
+    using registration_vec = std::vector<std::function<void()>>;
+    static registration_vec get_all();
+
 private:
-    using Registration = static_registration<void *, const JniClassInitializer>;
-    const std::function<void()> init;
-    const Registration reg;
-    JniClassInitializer(const std::function<void()> & init) : init(init), reg(this, this) {}
+
+    JniClassInitializer(std::function<void()> init);
+
     template <class C> friend class JniClass;
     friend void jniInit(JavaVM *);
+
+    static registration_vec & get_vec();
+    static std::mutex       & get_mutex();
 };
 
 /*
@@ -307,7 +279,7 @@ struct JavaProxyCacheTraits {
 };
 extern template class ProxyCache<JavaProxyCacheTraits>;
 using JavaProxyCache = ProxyCache<JavaProxyCacheTraits>;
-using JavaProxyCacheEntry = JavaProxyCache::Handle<GlobalRef<jobject>>;
+template <typename T> using JavaProxyHandle = JavaProxyCache::Handle<GlobalRef<jobject>, T>;
 
 /*
  * Cache for CppProxy objects. This is the inverse of the JavaProxyCache mechanism above,
@@ -349,7 +321,11 @@ template <class T>
 static const std::shared_ptr<T> & objectFromHandleAddress(jlong handle) {
     assert(handle);
     assert(handle > 4096);
-    const auto & ret = reinterpret_cast<const CppProxyHandle<T> *>(handle)->get();
+    // Below line segfaults gcc-4.8. Using a temporary variable hides the bug.
+    //const auto & ret = reinterpret_cast<const CppProxyHandle<T> *>(handle)->get();
+    const CppProxyHandle<T> *proxy_handle =
+        reinterpret_cast<const CppProxyHandle<T> *>(handle);
+    const auto & ret = proxy_handle->get();
     assert(ret);
     return ret;
 }
@@ -405,7 +381,7 @@ public:
 
         // Cases 3 and 4.
         assert(m_cppProxyClass);
-        return JniCppProxyCache::get(c, &newCppProxy);
+        return JniCppProxyCache::get(typeid(c), c, &newCppProxy);
 
     }
 
@@ -447,10 +423,10 @@ private:
      * Helpers for _toJava above. The possibility that an object is already a C++-side proxy
      * only exists if the code generator emitted one (if Self::JavaProxy exists).
      */
-    template <typename S, typename = typename S::JavaProxy>
+    template <typename S, typename JavaProxy = typename S::JavaProxy>
     jobject _unwrapJavaProxy(const std::shared_ptr<I> * c) const {
-        if (auto proxy = dynamic_cast<typename S::JavaProxy *>(c->get())) {
-            return proxy->JavaProxyCacheEntry::get().get();
+        if (auto proxy = dynamic_cast<JavaProxy *>(c->get())) {
+            return proxy->JavaProxyHandle<JavaProxy>::get().get();
         } else {
             return nullptr;
         }
@@ -484,16 +460,16 @@ private:
      * Helpers for _fromJava above. We can only produce a C++-side proxy if the code generator
      * emitted one (if Self::JavaProxy exists).
      */
-    template <typename S, typename = typename S::JavaProxy>
+    template <typename S, typename JavaProxy = typename S::JavaProxy>
     std::shared_ptr<I> _getJavaProxy(jobject j) const {
-        static_assert(std::is_base_of<JavaProxyCacheEntry, typename S::JavaProxy>::value,
+        static_assert(std::is_base_of<JavaProxyHandle<JavaProxy>, JavaProxy>::value,
             "JavaProxy must derive from JavaProxyCacheEntry");
 
-        return std::static_pointer_cast<typename S::JavaProxy>(JavaProxyCache::get(
-            j,
+        return std::static_pointer_cast<JavaProxy>(JavaProxyCache::get(
+            typeid(JavaProxy), j,
             [] (const jobject & obj) -> std::pair<std::shared_ptr<void>, jobject> {
-                auto ret = std::make_shared<typename S::JavaProxy>(obj);
-                return { ret, ret->JavaProxyCacheEntry::get().get() };
+                auto ret = std::make_shared<JavaProxy>(obj);
+                return { ret, ret->JavaProxyHandle<JavaProxy>::get().get() };
             }
         ));
     }
@@ -552,6 +528,9 @@ private:
 jstring jniStringFromUTF8(JNIEnv * env, const std::string & str);
 std::string jniUTF8FromString(JNIEnv * env, const jstring jstr);
 
+jstring jniStringFromWString(JNIEnv * env, const std::wstring & str);
+std::wstring jniWStringFromString(JNIEnv * env, const jstring jstr);
+
 class JniEnum {
 public:
     /*
@@ -567,11 +546,43 @@ public:
 
 protected:
     JniEnum(const std::string & name);
+    jclass enumClass() const { return m_clazz.get(); }
 
 private:
     const GlobalRef<jclass> m_clazz;
     const jmethodID m_staticmethValues;
     const jmethodID m_methOrdinal;
+};
+
+class JniFlags : private JniEnum {
+public:
+    /*
+     * Given a Java EnumSet convert it to the corresponding bit pattern
+     * which can then be static_cast<> to the actual enum.
+     */
+    unsigned flags(JNIEnv * env, jobject obj) const;
+
+    /*
+     * Create a Java EnumSet of the specified flags considering the given number of active bits.
+     */
+    LocalRef<jobject> create(JNIEnv * env, unsigned flags, int bits) const;
+
+    using JniEnum::create;
+
+protected:
+    JniFlags(const std::string & name);
+
+private:
+    const GlobalRef<jclass> m_clazz { jniFindClass("java/util/EnumSet") };
+    const jmethodID m_methNoneOf { jniGetStaticMethodID(m_clazz.get(), "noneOf", "(Ljava/lang/Class;)Ljava/util/EnumSet;") };
+    const jmethodID m_methAdd { jniGetMethodID(m_clazz.get(), "add", "(Ljava/lang/Object;)Z") };
+    const jmethodID m_methIterator { jniGetMethodID(m_clazz.get(), "iterator", "()Ljava/util/Iterator;") };
+    const jmethodID m_methSize { jniGetMethodID(m_clazz.get(), "size", "()I") };
+
+    struct {
+        const GlobalRef<jclass> clazz { jniFindClass("java/util/Iterator") };
+        const jmethodID methNext { jniGetMethodID(clazz.get(), "next", "()Ljava/lang/Object;") };
+    } m_iterator;
 };
 
 #define DJINNI_FUNCTION_PROLOGUE0(env_)

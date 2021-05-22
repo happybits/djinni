@@ -53,6 +53,8 @@ fi
 "$base_dir/../src/run-assume-built" \
     --java-out "$temp_out/java" \
     --java-package $java_package \
+    --java-class-access-modifier "package" \
+    --java-generate-interfaces true \
     --java-nullable-annotation "javax.annotation.CheckForNull" \
     --java-nonnull-annotation "javax.annotation.Nonnull" \
     --ident-java-field mFooBar \
@@ -65,9 +67,10 @@ fi
     --ident-jni-class NativeFooBar \
     --ident-jni-file NativeFooBar \
     \
-	--objc-out "$temp_out/objc" \
-	--objcpp-out "$temp_out/objc" \
+    --objc-out "$temp_out/objc" \
+    --objcpp-out "$temp_out/objc" \
     --objc-type-prefix TXS \
+    --objc-swift-bridging-header "TextSort-Bridging-Header" \
     \
     --idl "$in"
 
@@ -78,7 +81,7 @@ mirror() {
     local src="$1" ; shift
     local dest="$1" ; shift
     mkdir -p "$dest"
-    rsync -a --delete --checksum --itemize-changes "$src"/ "$dest" | grep -v '^\.' | sed "s/^/[$prefix]/"
+    rsync -r --delete --checksum --itemize-changes "$src"/ "$dest" | sed "s/^/[$prefix]/"
 }
 
 echo "Copying generated code to final directories..."

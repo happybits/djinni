@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
@@ -94,8 +95,17 @@ struct Enum {
 
     struct Boxed {
         using ObjcType = NSNumber*;
-        static CppType toCpp(ObjcType x) noexcept { return Enum::toCpp(static_cast<Enum::ObjcType>([x integerValue])); }
-        static ObjcType fromCpp(CppType x) noexcept { return [NSNumber numberWithInteger:static_cast<NSInteger>(Enum::fromCpp(x))]; }
+        static CppType toCpp(ObjcType x) noexcept { return toCpp(x, Tag<typename std::underlying_type<CppType>::type>()); }
+        static ObjcType fromCpp(CppType x) noexcept { return fromCpp(x, Tag<typename std::underlying_type<CppType>::type>()); }
+
+    private:
+        template<class T> struct Tag { };
+
+        static CppType toCpp(ObjcType x, Tag<int>) noexcept { return Enum::toCpp(static_cast<Enum::ObjcType>([x integerValue])); }
+        static ObjcType fromCpp(CppType x, Tag<int>) noexcept { return [NSNumber numberWithInteger:static_cast<NSInteger>(Enum::fromCpp(x))]; }
+
+        static CppType toCpp(ObjcType x, Tag<unsigned>) noexcept { return Enum::toCpp(static_cast<Enum::ObjcType>([x unsignedIntegerValue])); }
+        static ObjcType fromCpp(CppType x, Tag<unsigned>) noexcept { return [NSNumber numberWithUnsignedInteger:static_cast<NSUInteger>(Enum::fromCpp(x))]; }
     };
 };
 
@@ -115,6 +125,54 @@ struct String {
         return [[NSString alloc] initWithBytes:string.data()
                                         length:static_cast<NSUInteger>(string.size())
                                       encoding:NSUTF8StringEncoding];
+    }
+};
+
+template<int wcharTypeSize>
+static NSStringEncoding getWCharEncoding()
+{
+    static_assert(wcharTypeSize == 2 || wcharTypeSize == 4, "wchar_t must be represented by UTF-16 or UTF-32 encoding");
+    return {}; // unreachable
+}
+
+template<>
+inline NSStringEncoding getWCharEncoding<2>() {
+    // case when wchar_t is represented by utf-16 encoding
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+    return NSUTF16BigEndianStringEncoding;
+#else
+    return NSUTF16LittleEndianStringEncoding;
+#endif
+}
+
+template<>
+inline NSStringEncoding getWCharEncoding<4>() {
+    // case when wchar_t is represented by utf-32 encoding
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+    return NSUTF32BigEndianStringEncoding;
+#else
+    return NSUTF32LittleEndianStringEncoding;
+#endif
+}
+
+struct WString {
+    using CppType = std::wstring;
+    using ObjcType = NSString*;
+
+    using Boxed = WString;
+
+    static CppType toCpp(ObjcType string) {
+        assert(string);
+        NSStringEncoding encoding = getWCharEncoding<sizeof(wchar_t)>();
+        NSData* data = [string dataUsingEncoding:encoding];
+        return std::wstring((wchar_t*)[data bytes], [data length] / sizeof (wchar_t));
+    }
+
+    static ObjcType fromCpp(const CppType& string) {
+        assert(string.size() <= std::numeric_limits<NSUInteger>::max());
+        return [[NSString alloc] initWithBytes:string.data()
+                                     length:string.size() * sizeof(wchar_t)
+                                     encoding:getWCharEncoding<sizeof(wchar_t)>()];
     }
 };
 

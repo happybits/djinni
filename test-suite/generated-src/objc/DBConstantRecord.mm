@@ -19,13 +19,13 @@
 + (nonnull instancetype)constantRecordWithSomeInteger:(int32_t)someInteger
                                            someString:(nonnull NSString *)someString
 {
-    return [[self alloc] initWithSomeInteger:someInteger
-                                  someString:someString];
+    return [(DBConstantRecord*)[self alloc] initWithSomeInteger:someInteger
+                                                     someString:someString];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p someInteger:%@ someString:%@>", self.class, self, @(self.someInteger), self.someString];
+    return [NSString stringWithFormat:@"<%@ %p someInteger:%@ someString:%@>", self.class, (void *)self, @(self.someInteger), self.someString];
 }
 
 @end

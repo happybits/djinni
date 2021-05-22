@@ -16,12 +16,12 @@
 
 + (nonnull instancetype)nestedCollectionWithSetList:(nonnull NSArray<NSSet<NSString *> *> *)setList
 {
-    return [[self alloc] initWithSetList:setList];
+    return [(DBNestedCollection*)[self alloc] initWithSetList:setList];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p setList:%@>", self.class, self, self.setList];
+    return [NSString stringWithFormat:@"<%@ %p setList:%@>", self.class, (void *)self, self.setList];
 }
 
 @end

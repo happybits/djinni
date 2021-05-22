@@ -16,12 +16,12 @@
 
 + (nonnull instancetype)mapListRecordWithMapList:(nonnull NSArray<NSDictionary<NSString *, NSNumber *> *> *)mapList
 {
-    return [[self alloc] initWithMapList:mapList];
+    return [(DBMapListRecord*)[self alloc] initWithMapList:mapList];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p mapList:%@>", self.class, self, self.mapList];
+    return [NSString stringWithFormat:@"<%@ %p mapList:%@>", self.class, (void *)self, self.mapList];
 }
 
 @end

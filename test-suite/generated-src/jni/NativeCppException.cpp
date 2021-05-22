@@ -3,7 +3,6 @@
 
 #include "NativeCppException.hpp"  // my header
 #include "Marshal.hpp"
-#include "NativeCppException.hpp"
 
 namespace djinni_generated {
 
@@ -16,7 +15,7 @@ CJNIEXPORT void JNICALL Java_com_dropbox_djinni_test_CppException_00024CppProxy_
 {
     try {
         DJINNI_FUNCTION_PROLOGUE1(jniEnv, nativeRef);
-        delete reinterpret_cast<djinni::CppProxyHandle<::testsuite::CppException>*>(nativeRef);
+        delete reinterpret_cast<::djinni::CppProxyHandle<::testsuite::CppException>*>(nativeRef);
     } JNI_TRANSLATE_EXCEPTIONS_RETURN(jniEnv, )
 }
 
@@ -30,7 +29,7 @@ CJNIEXPORT jint JNICALL Java_com_dropbox_djinni_test_CppException_00024CppProxy_
     } JNI_TRANSLATE_EXCEPTIONS_RETURN(jniEnv, 0 /* value doesn't matter */)
 }
 
-CJNIEXPORT jobject JNICALL Java_com_dropbox_djinni_test_CppException_get(JNIEnv* jniEnv, jobject /*this*/)
+CJNIEXPORT jobject JNICALL Java_com_dropbox_djinni_test_CppException_00024CppProxy_get(JNIEnv* jniEnv, jobject /*this*/)
 {
     try {
         DJINNI_FUNCTION_PROLOGUE0(jniEnv);

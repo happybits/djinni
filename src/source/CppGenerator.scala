@@ -67,11 +67,33 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
     refs.hpp.add("#include <string>")
     refs.hpp.add("#include <map>")
 
+    val flagsType = "unsigned"
+    val enumType = "int"
+    val underlyingType = if(e.flags) flagsType else enumType
+
     writeHppFile(ident, origin, refs.hpp, refs.hppFwds, w => {
-      w.w(s"enum class $self : int").bracedSemi {
-        for (o <- e.options) {
-          writeDoc(w, o.doc)
-          w.wl(idCpp.enum(o.ident.name) + ",")
+      w.w(s"enum class $self : $underlyingType").bracedSemi {
+        writeEnumOptionNone(w, e, idCpp.enum)
+        writeEnumOptions(w, e, idCpp.enum)
+        writeEnumOptionAll(w, e, idCpp.enum)
+      }
+
+      if(e.flags) {
+        // Define some operators to make working with "enum class" flags actually practical
+        def binaryOp(op: String) {
+          w.w(s"constexpr $self operator$op($self lhs, $self rhs) noexcept").braced {
+            w.wl(s"return static_cast<$self>(static_cast<$flagsType>(lhs) $op static_cast<$flagsType>(rhs));")
+          }
+          w.w(s"inline $self& operator$op=($self& lhs, $self rhs) noexcept").braced {
+            w.wl(s"return lhs = lhs $op rhs;") // Ugly, yes, but complies with C++11 restricted constexpr
+          }
+        }
+        binaryOp("|")
+        binaryOp("&")
+        binaryOp("^")
+
+        w.w(s"constexpr $self operator~($self x) noexcept").braced {
+          w.wl(s"return static_cast<$self>(~static_cast<$flagsType>(x));")
         }
       }
       w.wl
@@ -104,7 +126,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
             w.wl("template <>")
             w.w(s"struct hash<$fqSelf>").bracedSemi {
               w.w(s"size_t operator()($fqSelf type) const").braced {
-                w.wl("return std::hash<int>()(static_cast<int>(type));")
+                w.wl(s"return std::hash<$underlyingType>()(static_cast<$underlyingType>(type));")
               }
             }
           }
@@ -113,11 +135,35 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
     })
   }
 
+  def shouldConstexpr(c: Const) = {
+    // Make sure we don't constexpr optionals as some might not support it
+    val canConstexpr = c.ty.resolved.base match {
+      case p: MPrimitive if c.ty.resolved.base != MOptional => true
+      case _ => false
+    }
+    canConstexpr
+  }
+
   def generateHppConstants(w: IndentWriter, consts: Seq[Const]) = {
     for (c <- consts) {
+      // set value in header if can constexpr (only primitives)
+      var constexpr = shouldConstexpr(c)
+      var constValue = ";"
+      if (constexpr) {
+        constValue = c.value match {
+        case l: Long => " = " + l.toString + ";"
+        case d: Double if marshal.fieldType(c.ty) == "float" => " = " + d.toString + "f;"
+        case d: Double => " = " + d.toString + ";"
+        case b: Boolean => if (b) " = true;" else " = false;"
+        case _ => ";"
+        }
+      }
+      val constFieldType = if (constexpr) s"constexpr ${marshal.fieldType(c.ty)}" else s"${marshal.fieldType(c.ty)} const"
+
+      // Write code to the header file
       w.wl
       writeDoc(w, c.doc)
-      w.wl(s"static ${marshal.fieldType(c.ty)} const ${idCpp.const(c.ident)};")
+      w.wl(s"static ${constFieldType} ${idCpp.const(c.ident)}${constValue}")
     }
   }
 
@@ -128,7 +174,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
       case d: Double => w.w(d.toString)
       case b: Boolean => w.w(if (b) "true" else "false")
       case s: String => w.w("{" + s + "}")
-      case e: EnumValue => w.w(marshal.typename(ty) + "::" + idCpp.enum(e.ty.name + "_" + e.name))
+      case e: EnumValue => w.w(marshal.typename(ty) + "::" + idCpp.enum(e.name))
       case v: ConstRef => w.w(selfName + "::" + idCpp.const(v))
       case z: Map[_, _] => { // Value is record
         val recordMdef = ty.resolved.base.asInstanceOf[MDef]
@@ -151,8 +197,12 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
     val skipFirst = SkipFirst()
     for (c <- consts) {
       skipFirst{ w.wl }
-      w.w(s"${marshal.fieldType(c.ty)} const $selfName::${idCpp.const(c.ident)} = ")
-      writeCppConst(w, c.ty, c.value)
+      if (shouldConstexpr(c)){
+        w.w(s"${marshal.fieldType(c.ty)} constexpr $selfName::${idCpp.const(c.ident)}")
+      } else {
+        w.w(s"${marshal.fieldType(c.ty)} const $selfName::${idCpp.const(c.ident)} = ")
+        writeCppConst(w, c.ty, c.value)
+      }
       w.wl(";")
     }
   }
@@ -169,12 +219,16 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
 
     // Requiring the extended class
     if (r.ext.cpp) {
-      refs.hpp.add(s"struct $self; // Requiring extended class")
-      refs.cpp.add("#include "+q("../" + spec.cppFileIdentStyle(ident) + "." + spec.cppHeaderExt))
+      refs.cpp.add("#include "+q(spec.cppExtendedRecordIncludePrefix + spec.cppFileIdentStyle(ident) + "." + spec.cppHeaderExt))
     }
 
     // C++ Header
     def writeCppPrototype(w: IndentWriter) {
+      if (r.ext.cpp) {
+        w.w(s"struct $self; // Requiring extended class")
+        w.wl
+        w.wl
+      }
       writeDoc(w, doc)
       writeCppTypeParams(w, params)
       w.w("struct " + actualSelf + cppFinal).bracedSemi {
@@ -229,7 +283,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
 
     writeHppFile(cppName, origin, refs.hpp, refs.hppFwds, writeCppPrototype)
 
-    if (r.consts.nonEmpty || r.derivingTypes.nonEmpty) {
+    if (r.consts.nonEmpty || r.derivingTypes.contains(DerivingType.Eq) || r.derivingTypes.contains(DerivingType.Ord)) {
       writeCppFile(cppName, origin, refs.cpp, w => {
         generateCppConstants(w, r.consts, actualSelf)
 
@@ -292,6 +346,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
     })
 
     val self = marshal.typename(ident, i)
+    val methodNamesInScope = i.methods.map(m => idCpp.method(m.ident))
 
     writeHppFile(ident, origin, refs.hpp, refs.hppFwds, w => {
       writeDoc(w, doc)
@@ -305,9 +360,9 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
         // Methods
         for (m <- i.methods) {
           w.wl
-          writeDoc(w, m.doc)
-          val ret = marshal.returnType(m.ret)
-          val params = m.params.map(p => marshal.paramType(p.ty) + " " + idCpp.local(p.ident))
+          writeMethodDoc(w, m, idCpp.local)
+          val ret = marshal.returnType(m.ret, methodNamesInScope)
+          val params = m.params.map(p => marshal.paramType(p.ty, methodNamesInScope) + " " + idCpp.local(p.ident))
           if (m.static) {
             w.wl(s"static $ret ${idCpp.method(m.ident)}${params.mkString("(", ", ", ")")};")
           } else {

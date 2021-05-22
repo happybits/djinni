@@ -35,11 +35,12 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
   def writeJniHppFile(name: String, origin: String, includes: Iterable[String], fwds: Iterable[String], f: IndentWriter => Unit, f2: IndentWriter => Unit = (w => {})) =
     writeHppFileGeneric(spec.jniHeaderOutFolder.get, spec.jniNamespace, spec.jniFileIdentStyle)(name, origin, includes, fwds, f, f2)
 
-  class JNIRefs(name: String) {
+  class JNIRefs(name: String, cppPrefixOverride: Option[String]=None) {
     var jniHpp = mutable.TreeSet[String]()
     var jniCpp = mutable.TreeSet[String]()
 
-    jniHpp.add("#include " + q(spec.jniIncludeCppPrefix + spec.cppFileIdentStyle(name) + "." + spec.cppHeaderExt))
+    val cppPrefix = cppPrefixOverride.getOrElse(spec.jniIncludeCppPrefix)
+    jniHpp.add("#include " + q(cppPrefix + spec.cppFileIdentStyle(name) + "." + spec.cppHeaderExt))
     jniHpp.add("#include " + q(spec.jniBaseLibIncludePrefix + "djinni_support.hpp"))
     spec.cppNnHeader match {
       case Some(nnHdr) => jniHpp.add("#include " + nnHdr)
@@ -63,26 +64,38 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
     val cppSelf = cppMarshal.fqTypename(ident, e)
 
     writeJniHppFile(ident, origin, Iterable.concat(refs.jniHpp, refs.jniCpp), Nil, w => {
-      w.w(s"class $jniHelper final : ::djinni::JniEnum").bracedSemi {
+      val base = if(e.flags) "JniFlags" else "JniEnum"
+      val count = normalEnumOptions(e).length
+      w.w(s"class $jniHelper final : ::djinni::$base").bracedSemi {
         w.wlOutdent("public:")
         w.wl(s"using CppType = $cppSelf;")
         w.wl(s"using JniType = jobject;")
         w.wl
         w.wl(s"using Boxed = $jniHelper;")
         w.wl
-        w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j) { return static_cast<CppType>(::djinni::JniClass<$jniHelper>::get().ordinal(jniEnv, j)); }")
-        w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, CppType c) { return ::djinni::JniClass<$jniHelper>::get().create(jniEnv, static_cast<jint>(c)); }")
+        if(e.flags) {
+          w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j) { return static_cast<CppType>(::djinni::JniClass<$jniHelper>::get().flags(jniEnv, j)); }")
+          w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, CppType c) { return ::djinni::JniClass<$jniHelper>::get().create(jniEnv, static_cast<unsigned>(c), $count); }")
+        } else {
+          w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j) { return static_cast<CppType>(::djinni::JniClass<$jniHelper>::get().ordinal(jniEnv, j)); }")
+          w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, CppType c) { return ::djinni::JniClass<$jniHelper>::get().create(jniEnv, static_cast<jint>(c)); }")
+        }
         w.wl
         w.wlOutdent("private:")
         val classLookup = q(jniMarshal.undecoratedTypename(ident, e))
-        w.wl(s"$jniHelper() : JniEnum($classLookup) {}")
+        w.wl(s"$jniHelper() : $base($classLookup) {}")
         w.wl(s"friend ::djinni::JniClass<$jniHelper>;")
       }
     })
   }
 
   override def generateRecord(origin: String, ident: Ident, doc: Doc, params: Seq[TypeParam], r: Record) {
-    val refs = new JNIRefs(ident.name)
+    val prefixOverride: Option[String] = if (r.ext.cpp) {
+      Some(spec.cppExtendedRecordIncludePrefix)
+    } else {
+      None
+    }
+    val refs = new JNIRefs(ident.name, prefixOverride)
     r.fields.foreach(f => refs.find(f.ty))
 
     val jniHelper = jniMarshal.helperClass(ident)
@@ -221,9 +234,8 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"friend $baseType;")
         w.wl
         if (i.ext.java) {
-          w.wl(s"class JavaProxy final : ::djinni::JavaProxyCacheEntry, public $cppSelf").bracedSemi {
+          w.wl(s"class JavaProxy final : ::djinni::JavaProxyHandle<JavaProxy>, public $cppSelf").bracedSemi {
             w.wlOutdent(s"public:")
-            // w.wl(s"using JavaProxyCacheEntry::JavaProxyCacheEntry;")
             w.wl(s"JavaProxy(JniType j);")
             w.wl(s"~JavaProxy();")
             w.wl
@@ -318,7 +330,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
           val methodNameMunged = name.replaceAllLiterally("_", "_1")
           val zero = ret.fold("")(s => "0 /* value doesn't matter */")
           if (static) {
-            w.wl(s"CJNIEXPORT $jniRetType JNICALL ${prefix}_$methodNameMunged(JNIEnv* jniEnv, jobject /*this*/${preComma(paramList)})").braced {
+            w.wl(s"CJNIEXPORT $jniRetType JNICALL ${prefix}_00024CppProxy_$methodNameMunged(JNIEnv* jniEnv, jobject /*this*/${preComma(paramList)})").braced {
               w.w("try").bracedEnd(s" JNI_TRANSLATE_EXCEPTIONS_RETURN(jniEnv, $zero)") {
                 w.wl(s"DJINNI_FUNCTION_PROLOGUE0(jniEnv);")
                 f
@@ -335,7 +347,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
           }
         }
         nativeHook("nativeDestroy", false, Seq.empty, None, {
-          w.wl(s"delete reinterpret_cast<djinni::CppProxyHandle<$cppSelf>*>(nativeRef);")
+          w.wl(s"delete reinterpret_cast<::djinni::CppProxyHandle<$cppSelf>*>(nativeRef);")
         })
         for (m <- i.methods) {
           val nativeAddon = if (m.static) "" else "native_"

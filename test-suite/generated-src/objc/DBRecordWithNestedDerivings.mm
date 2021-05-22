@@ -19,8 +19,8 @@
 + (nonnull instancetype)recordWithNestedDerivingsWithKey:(int32_t)key
                                                      rec:(nonnull DBRecordWithDerivings *)rec
 {
-    return [[self alloc] initWithKey:key
-                                 rec:rec];
+    return [(DBRecordWithNestedDerivings*)[self alloc] initWithKey:key
+                                                               rec:rec];
 }
 
 - (BOOL)isEqual:(id)other
@@ -62,7 +62,7 @@
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p key:%@ rec:%@>", self.class, self, @(self.key), self.rec];
+    return [NSString stringWithFormat:@"<%@ %p key:%@ rec:%@>", self.class, (void *)self, @(self.key), self.rec];
 }
 
 @end

@@ -16,12 +16,12 @@
 
 + (nonnull instancetype)itemListWithItems:(nonnull NSArray<NSString *> *)items
 {
-    return [[self alloc] initWithItems:items];
+    return [(TXSItemList*)[self alloc] initWithItems:items];
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p items:%@>", self.class, self, self.items];
+    return [NSString stringWithFormat:@"<%@ %p items:%@>", self.class, (void *)self, self.items];
 }
 
 @end

@@ -16,7 +16,7 @@
 
 + (nonnull instancetype)recordWithDurationAndDerivingsWithDt:(NSTimeInterval)dt
 {
-    return [[self alloc] initWithDt:dt];
+    return [(DBRecordWithDurationAndDerivings*)[self alloc] initWithDt:dt];
 }
 
 - (BOOL)isEqual:(id)other
@@ -52,7 +52,7 @@
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<%@ %p dt:%@>", self.class, self, @(self.dt)];
+    return [NSString stringWithFormat:@"<%@ %p dt:%@>", self.class, (void *)self, @(self.dt)];
 }
 
 @end
