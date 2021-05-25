@@ -15,7 +15,7 @@ done
 base_dir=$(cd "`dirname "$loc"`" && pwd)
 
 need_to_build=0
-dependencies=("build.sbt" "project/plugins.sbt" "source")
+dependencies=("build" "build.sbt" "project/plugins.sbt" "source")
 launcher="target/start"
 
 if [ $# -ne 0 ]; then
@@ -42,7 +42,12 @@ fi
 if [ "$need_to_build" -eq 1 ]; then
     echo "Building Djinni..."
     cd "$base_dir"
-    ./support/sbt compile start-script
+    
+    # Store dependencies in this repo so not everyone has to download them separately.
+    ivy_home=target/ivy2
+    # Clear out old artifacts so we're left with only the ones we need.
+    rm -r "$ivy_home"
+    ./support/sbt -Dsbt.ivy.home="$ivy_home" compile start-script
 else
     echo "Already up to date: Djinni"
 fi
